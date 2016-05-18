@@ -31,17 +31,14 @@ if(!empty($transaction_history_link))
  <?php
  }
  ?>
-<form action="<?php echo $action; ?>" method="post">
-	<input type="hidden" name="jostpay_mert_id" value="<?php echo $ap_merchant;?>" />
-	<input type="hidden" name="jostpay_tranx_id" value="<?php echo $trans_id; ?>" />
-	<input type="hidden" name="jostpay_tranx_amt" value="<?php echo $jostpay_amount ; ?>" />
-	<input type="hidden" name="jostpay_tranx_curr" value="<?php echo $jostpay_currency_code; ?>" />
-	<input type="hidden" name="jostpay_cust_id" value="<?php echo $order_id; ?>" />
-	<input type="hidden" name="jostpay_cust_name" value="<?php echo $full_name; ?>" />
-	<input type="hidden" name="jostpay_tranx_memo" value="Product" />
-	<input type="hidden" name="jostpay_hash" value="<?php echo $jostpay_hash ; ?>" />
-	<input type="hidden" name="jostpay_tranx_hash" value="<?php echo $jostpay_tranx_hash ; ?>" />
-	<input type="hidden" name="jostpay_tranx_noti_url" value="<?php echo $notify_url;?>" />
+<form action="<?php echo $action; ?>" method="post">	
+	<input type='hidden' name='amount' value='<?php echo $ap_amount; ?>' />
+	<input type='hidden' name='merchant' value='<?php echo $ap_merchant;?>' />
+	<input type='hidden' name='ref' value='<?php echo $trans_id; ?>' />
+	<input type='hidden' name='memo' value="<?php echo $ap_itemname ?>" />
+	<input type='hidden' name='notification_url' value='<?php echo $notify_url;?>' />
+	<input type='hidden' name='success_url' value='<?php echo $ap_cancelurl; ?>' />
+	<input type='hidden' name='cancel_url' value='<?php echo $ap_returnurl; ?>' />
 
 	<b> Note : </b> If you Choose Payment Gateway as JostPay, then all other currency format converted into Naira (NGN / N) at the time of Payment!
   <div class="buttons">

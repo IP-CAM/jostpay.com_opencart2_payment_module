@@ -2,8 +2,8 @@
 ###############################################################################
 # PROGRAM     : JostPay OpenCart 2.00  Payment Module                           #
 # DATE	      : 09-06-2015                       				              #
-# AUTHOR      : EDIARO                                                #
-# AUTHOR URI  : http://www.ediaro.com	                                      #
+# AUTHOR      : JOSTPAY                                                #
+# AUTHOR URI  : http://www.jostpay.com	                                      #
 ###############################################################################
 class ControllerInformationJostPay extends Controller
  {     
@@ -48,20 +48,16 @@ class ControllerInformationJostPay extends Controller
 				$query=$this->db->query("SELECT * FROM ".DB_PREFIX."jostpay WHERE order_id='".$this->db->escape($order_id)."' LIMIT 1");
 				
 				if(empty($query->row))$toecho="<h3>Order record not found!</h3>";
-				elseif(!empty($query->row['response_description']))$toecho="<h3>Order $order_id has been already processed!</h3>";
+				elseif(!empty($query->row['response_code']))$toecho="<h3>Order $order_id has been already processed!</h3>";
 				else
 				{
 					$mertid=$this->config->get('jostpay_merchant_id');
-					$hashkey=$this->config->get('jostpay_hash_key');
 					$order_info = $this->model_checkout_order->getOrder($order_id);
-					$amount=$query->row['transaction_amount']*100 ;//TODO: FORMAT INFO TO BE DISSPLAYE
+					$amount=$query->row['transaction_amount'];
 					$jostpay_tranx_id=$query->row['transaction_id'];
-					
-					$hash=hash("sha512",$mertid.$jostpay_tranx_id.$hashkey);
-					$url="https://ibank.gtbank.com/JostPayService/gettransactionstatus.json?mertid=$mertid&amount=$amount&tranxid=$jostpay_tranx_id&hash=$hash";
+					$url="https://jostpay.com/api_v1?action=get_transaction&jostpay_id=$mertid&ref=$jostpay_tranx_id&amount=$amount";
 					$ch = curl_init();
 					//	curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
-				
 					curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);			
 					curl_setopt($ch, CURLOPT_AUTOREFERER, TRUE);
 					curl_setopt($ch, CURLOPT_HEADER, 0);
@@ -72,7 +68,6 @@ class ControllerInformationJostPay extends Controller
 					$returnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 					curl_close($ch);
 					
-						
 					if($returnCode == 200)
 					{
 						$json=@json_decode($response,true);
@@ -88,7 +83,7 @@ class ControllerInformationJostPay extends Controller
 					
 					if(!empty($json))
 					{
-						if($json['ResponseCode']=='00')
+						if($json['status_msg']=='COMPLETED')
 						{
 							$order_status_id = $this->config->get('jostpay_completed_status_id');
 							$info="Payment Confirmation Successfull";
@@ -96,23 +91,24 @@ class ControllerInformationJostPay extends Controller
 						}
 						else//transaction not completed for one reason or the other.
 						{
-							$order_status_id = $this->config->get('jostpay_failed_status_id');	
-							$info="Confirmation failed: ".$json['ResponseDescription'];
+							if($json['status_msg']=='FAILED')$order_status_id = $this->config->get('jostpay_failed_status_id');	
+							else $order_status_id = $this->config->get('jostpay_pending_order_status_id');	
+							$info="Payment Not Cofirmed: ".$json['info'];
 						}
 						
 						if(!$order_info['order_status_id'])$this->model_checkout_order->confirm($order_id, $order_status_id);
 						else $this->model_checkout_order->update($order_id, $order_status_id);		
-						
-						
+
 						$this->db->query("UPDATE ".DB_PREFIX."jostpay SET
-							approved_amount='".$this->db->escape($this->request->post['Amount'])."',
-							response_code='".$this->db->escape($json['ResponseCode'])."',
-							response_description='".$this->db->escape($json['ResponseDescription'])."'
+							approved_amount='".$this->db->escape($json['amount'])."',
+							response_code='{$json['status']}',
+							response_description='".$this->db->escape($json['info'])."'
 							WHERE order_id='$order_id' LIMIT 1");
 					}
 					
 					$toecho.=$info;
 				}
+			
 			}
 		
 		
@@ -170,7 +166,7 @@ class ControllerInformationJostPay extends Controller
 				{
 					$sn++;
 					
-					if(empty($row['response_description']))
+					if(empty($row['response_code']))
 					{
 						$transaction_response='(pending)';
 						$trans_action=$this->url->link('information/jostpay',"p=$p&order_id={$row['order_id']}");

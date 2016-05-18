@@ -2,8 +2,8 @@
 ###############################################################################
 # PROGRAM     : JostPay OpenCart 2.00  Payment Module                        #
 # DATE	      : 09-06-2015                       				              #
-# AUTHOR      : EDIARO                                                #
-# AUTHOR URI  : http://www.ediaro.com	                                      #
+# AUTHOR      : JOSTPAY                                                #
+# AUTHOR URI  : http://www.jostpay.com	                                      #
 ###############################################################################
 
 class ControllerPaymentJostPay extends Controller {
@@ -31,7 +31,6 @@ class ControllerPaymentJostPay extends Controller {
 		$data['text_all_zones'] = $this->language->get('text_all_zones');
 
 		$data['entry_merchant_id'] = $this->language->get('entry_merchant_id');
-		$data['entry_hash_key'] = $this->language->get('entry_hash_key');
 		$data['entry_callback'] = $this->language->get('entry_callback');
 		$data['entry_total'] = $this->language->get('entry_total');
 		$data['entry_pending_order_status'] = $this->language->get('entry_pending_order_status');
@@ -61,11 +60,6 @@ class ControllerPaymentJostPay extends Controller {
 			$data['error_merchant_id'] = '';
 		}
 
-		if (isset($this->error['security'])) {
-			$data['error_hash_key'] = $this->error['security'];
-		} else {
-			$data['error_hash_key'] = '';
-		}
 
 		$data['breadcrumbs'] = array();
 
@@ -94,11 +88,6 @@ class ControllerPaymentJostPay extends Controller {
 			$data['jostpay_merchant_id'] = $this->config->get('jostpay_merchant_id');
 		}
 
-		if (isset($this->request->post['jostpay_hash_key'])) {
-			$data['jostpay_hash_key'] = $this->request->post['jostpay_hash_key'];
-		} else {
-			$data['jostpay_hash_key'] = $this->config->get('jostpay_hash_key');
-		}
 
 		if (isset($this->request->post['jostpay_live_mode'])) {
 			$data['jostpay_live_mode'] = $this->request->post['jostpay_live_mode'];
@@ -174,10 +163,6 @@ class ControllerPaymentJostPay extends Controller {
 
 		if (!$this->request->post['jostpay_merchant_id']) {
 			$this->error['merchant'] = $this->language->get('error_merchant_id');
-		}
-
-		if (!$this->request->post['jostpay_hash_key']) {
-			$this->error['security'] = $this->language->get('error_hash_key');
 		}
 
 		return !$this->error;

@@ -10,7 +10,6 @@ $_['text_jostpay']				 = '<a href="https://www.jostpay.com" target="_blank"><img
 
 // Entry
 $_['entry_merchant_id']				= 'JostPay Merchant ID';
-$_['entry_hash_key']				= 'JostPay Hash Key';
 $_['entry_live_mode']				= 'JostPay Live Mode';
 $_['entry_callback']				= 'Alert URL';
 $_['entry_total']					= 'Total';
@@ -28,4 +27,3 @@ $_['help_total']					= 'The checkout total the order must reach before this paym
 // Error
 $_['error_permission']				= 'Warning: You do not have permission to modify payment JostPay!';
 $_['error_merchant_id']				= 'Merchant ID Required!';
-$_['error_hash_key']				= 'JostPay Hash Key Required!';

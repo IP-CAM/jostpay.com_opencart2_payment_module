@@ -2,8 +2,8 @@
 ###############################################################################
 # PROGRAM     : JostPay OpenCart 2.00  Payment Module                           #
 # DATE	      : 09-06-2015                       				              #
-# AUTHOR      : EDIARO                                                #
-# AUTHOR URI  : http://www.ediaro.com	                                      #
+# AUTHOR      : JOSTPAY                                                #
+# AUTHOR URI  : http://www.jostpay.com	                                      #
 ###############################################################################
 class ControllerPaymentJostPay extends Controller 
 {
@@ -15,7 +15,7 @@ class ControllerPaymentJostPay extends Controller
 		$data['order_id'] = $order_id =  $this->session->data['order_id'];
 		$order_info = $this->model_checkout_order->getOrder($this->session->data['order_id']);
 
-		$data['action'] = 'https://ibank.gtbank.com/JostPay/Tranx.aspx';
+		$data['action'] = 'https://jostpay.com/sci';
 
 		$data['ap_merchant'] = $this->config->get('jostpay_merchant_id');
 		$data['ap_amount'] = $this->currency->format($order_info['total'], $order_info['currency_code'], $order_info['currency_value'], false);
@@ -27,19 +27,9 @@ class ControllerPaymentJostPay extends Controller
 		$data['ap_cancelurl'] = $this->url->link('checkout/checkout', '', 'SSL');	
 		$data['notify_url'] = $this->url->link('payment/jostpay/callback', '', 'SSL');
 
-		$data['jostpay_amount'] = $data['ap_amount'] * 100 ;
 		$data['jostpay_currency_code']=($order_info['currency_code']=='USD')?840:566;
 		$data['trans_id'] = $trans_id =  time(); // date("ymds");
-		$data['full_name'] = html_entity_decode($order_info['payment_firstname'], ENT_QUOTES, 'UTF-8')  . ' ' . html_entity_decode($order_info['payment_lastname'], ENT_QUOTES, 'UTF-8');
-		
-		$jostpay_HashKey =  $this->config->get('jostpay_hash_key');
-		$data['jostpay_tranx_hash'] = hash ('sha512', $trans_id. $data['jostpay_amount'].$data['notify_url'].$jostpay_HashKey );
-		
-		$hash_data=$data['ap_merchant'].$trans_id. $data['jostpay_amount'].$data['jostpay_currency_code'].$data['order_id'].$data['notify_url'].$jostpay_HashKey;
-		
-		$data['jostpay_hash'] = hash ('sha512', $hash_data);
-		
-		
+		$data['full_name'] = html_entity_decode($order_info['payment_firstname'], ENT_QUOTES, 'UTF-8')  . ' ' . html_entity_decode($order_info['payment_lastname'], ENT_QUOTES, 'UTF-8');		
 		
 		$this->model_checkout_order->addOrderHistory($order_id, $this->config->get('jostpay_pending_status_id'));
 		if ($this->customer->isLogged())
@@ -51,14 +41,14 @@ class ControllerPaymentJostPay extends Controller
 				id int not null auto_increment,
 				primary key(id),
 				order_id INT NOT NULL,unique(order_id),
-				date_time datetime,
-				transaction_id VARCHAR(48),
-				approved_amount VARCHAR(12),
-				customer_email VARCHAR(68),
+				date_time DATETIME,
+				transaction_id INT NOT NULL,
+				approved_amount DOUBLE NOT NULL,
+				customer_email VARCHAR(128) NOT NULL,
 				response_description VARCHAR(225),
-				response_code VARCHAR(5),
-				transaction_amount varchar(12),
-				customer_id INT
+				response_code VARCHAR(5) NOT NULL,
+				transaction_amount DOUBLE NOT NULL,
+				customer_id INT NOT NULL
 				)";
 		$this->db->query($sql);
 		$customer_id=$this->customer->isLogged()?$this->customer->getId():"";
@@ -88,113 +78,95 @@ class ControllerPaymentJostPay extends Controller
 	
 	
 	public function callback() 
-	{		
-		if(empty($this->request->post['jostpay_cust_id']))
-		{
-			$order_id="";
-			$order_info=array();
-		}
+	{	
+		$trans_ref = @$this->request->post['ref'];
+		$order_info=array();
+		$order_id="";
+	
+		if(!empty($trans_ref))$query=$this->db->query("SELECT * FROM ".DB_PREFIX."jostpay WHERE transaction_id='".$this->db->escape($trans_ref)."' LIMIT 1");
+		
+		if(empty($trans_ref))$toecho="<h3>Transaction reference not supplied!</h3>";
+		if(empty($query->row))$toecho="<h3>Transaction record #$trans_ref not found!</h3>";
+		elseif(!empty($query->row['response_code']))$toecho="<h3>Transaction Ref $trans_ref has been already processed!</h3>";		
 		else
 		{
-			$order_id=$this->request->post['jostpay_cust_id'];		
+			$order_id=$query->row['order_id'];
 			$this->load->model('checkout/order');
 			$order_info = $this->model_checkout_order->getOrder($order_id);
 			$order_status_id = $this->config->get('jostpay_failed_status_id');	
 			$ap_amount = $this->currency->format($order_info['total'], $order_info['currency_code'], $order_info['currency_value'], false);
-		}
-	
-	
-		if(empty($order_info))
-		{
-			$info="Order info not found";
-			$this->notifyAdmin($info);
-		}
-		elseif($this->request->post['jostpay_tranx_status_code']!='00')
-		{
-			$info=$this->request->post['jostpay_tranx_status_msg'];
-			$this->notifyAdmin($info);
-		}
-		elseif(floatval($this->request->post['jostpay_tranx_amt'])<floatval($ap_amount))
-		{
-			$info="Amount paid {$this->request->post['jostpay_tranx_amt']} NGN is different from the expected payment amount $ap_amount NGN.";
-		}
-		else
-		{
-			$jostpay_tranx_id = $this->request->post['jostpay_tranx_id'];
-			$order_status_id = $this->config->get('jostpay_completed_status_id');
-			$info=$this->request->post['jostpay_tranx_status_msg'];
-			$success=true;			
 			
-			if($this->config->get('jostpay_live_mode'))
-			{
-			$mertid=$this->config->get('jostpay_merchant_id');
-			$hashkey=$this->config->get('jostpay_hash_key');
-			$amount=$ap_amount * 100 ;
-			
-			$hash=hash("sha512",$mertid.$jostpay_tranx_id.$hashkey);
-			
-			$url="https://ibank.gtbank.com/JostPayService/gettransactionstatus.json?mertid=$mertid&amount=$amount&tranxid=$jostpay_tranx_id&hash=$hash";
-
-			$ch = curl_init();			
-				curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);			
-				curl_setopt($ch, CURLOPT_AUTOREFERER, TRUE);
-				curl_setopt($ch, CURLOPT_HEADER, 0);
-				curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-				curl_setopt($ch, CURLOPT_URL, $url);
-				
-				$response = curl_exec($ch);
-				$returnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-				if($returnCode != 200)$response=curl_error($ch);
-				curl_close($ch);
-				
-				
-			if($returnCode == 200)$json=@json_decode($response,true);
-			else
-			{
-				$json=null;
-				$info="HTTP Error $returnCode: $response; Accessing jostpay confirmation page";
-				//$order_status_id = $this->config->get('jostpay_pending_order_status_id');
-			}
-			
-			
-			if(empty($json))
-			{
-				if(empty($info))$info="Error verifying payment";
-				$this->notifyAdmin($info);
-			}
-			else
-			{
-				if($json['ResponseCode']=='00')
+				if(empty($order_info))
 				{
-					$order_status_id = $this->config->get('jostpay_completed_status_id');
-					$info=$json['ResponseDescription'];
-					$success=true;
+					$info="Order info not found";
+					$this->notifyAdmin($info);
 				}
 				else
 				{
-					$success=false;
-					$order_status_id = $this->config->get('jostpay_failed_status_id');	
-					$info="ERROR: ".$json['ResponseDescription'];
-				}
-				
-				$this->notifyAdmin("$info , Response: $response");
-			}
-			}//end live mode check
-		}
-		
-		//todo: check if not already completed status.
+					$mertid=$this->config->get('jostpay_merchant_id');
+					$amount=$query->row['transaction_amount'];
+					$jostpay_tranx_id=$query->row['transaction_id'];
+					$temp_amount=floatval($ap_amount);
+					
+					$url="https://jostpay.com/api_v1?action=get_transaction&jostpay_id=$mertid&ref=$jostpay_tranx_id&amount=$temp_amount";
+					$ch = curl_init();
+					//	curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+					curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);			
+					curl_setopt($ch, CURLOPT_AUTOREFERER, TRUE);
+					curl_setopt($ch, CURLOPT_HEADER, 0);
+					curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+					curl_setopt($ch, CURLOPT_URL, $url);
+					
+					$response = curl_exec($ch);
+					$returnCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+					curl_close($ch);
+					
+					if($returnCode == 200)
+					{
+						$json=@json_decode($response,true);
+					}
+					else
+					{
+						$success=false;
+						$json=null;
+						$info="Error ($returnCode) accessing jostpay confirmation page";
+						//$this->notifyAdmin($info);
+						//$order_status_id = $this->config->get('jostpay_pending_order_status_id');
+					}
+					
+					
+					if(!empty($json))
+					{
+						if($json['status_msg']=='COMPLETED')
+						{
+							$order_status_id = $this->config->get('jostpay_completed_status_id');
+							$info="Payment Confirmation Successfull";
+							$success=true;
+						}
+						else//transaction not completed for one reason or the other.
+						{
+							if($json['status_msg']=='FAILED')$order_status_id = $this->config->get('jostpay_failed_status_id');	
+							else $order_status_id = $this->config->get('jostpay_pending_order_status_id');	
+							$info="Payment Not Cofirmed: ".$json['info'];
+						}
+						
+						
+						//$this->model_checkout_order->addOrderHistory($order_id, $order_status_id);
+						
+						if(!$order_info['order_status_id'])$this->model_checkout_order->confirm($order_id, $order_status_id);
+						else $this->model_checkout_order->update($order_id, $order_status_id);		
+						
 
-		if(!empty($order_info))
-		{
-			$this->model_checkout_order->addOrderHistory($order_id, $order_status_id);
-			$status=empty($success)?'completed':'failed';
-			
-			$this->db->query("UPDATE ".DB_PREFIX."jostpay SET
-				approved_amount='".$this->db->escape($this->request->post['jostpay_tranx_amt'])."',
-				response_code='".$this->db->escape($this->request->post['jostpay_tranx_status_code'])."',
-				response_description='".$this->db->escape($this->request->post['jostpay_tranx_status_msg'])."'
-				WHERE order_id='$order_id'");
-		}
+						$this->db->query("UPDATE ".DB_PREFIX."jostpay SET
+							approved_amount='".$this->db->escape($json['amount'])."',
+							response_code='{$json['status']}',
+							response_description='".$this->db->escape($json['info'])."'
+							WHERE order_id='$order_id' LIMIT 1");
+					}
+					
+					$this->notifyAdmin("$info , Response: $response");
+				}			
+			}
 
        $this->document->setTitle("JostPay Order Payment: $info");
 		

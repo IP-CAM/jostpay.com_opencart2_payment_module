@@ -3,11 +3,11 @@ CREATE TABLE IF NOT EXISTS oc_jostpay(
 				primary key(id),
 				order_id INT NOT NULL,unique(order_id),
 				date_time datetime,
-				transaction_id VARCHAR(48),
-				approved_amount VARCHAR(12),
-				customer_email VARCHAR(68),
+				transaction_id INT(48),
+				approved_amount DOUBLE NOT NULL,
+				customer_email VARCHAR(128),
 				response_description VARCHAR(225),
 				response_code VARCHAR(5),
-				transaction_amount varchar(12),
-				customer_id INT
+				transaction_amount DOUBLE NOT NULL,
+				customer_id INT NOT NULL
 				)"

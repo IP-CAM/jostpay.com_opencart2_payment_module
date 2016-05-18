@@ -34,15 +34,6 @@
               <?php } ?>
             </div>
           </div>
-          <div class="form-group required">
-            <label class="col-sm-2 control-label" for="input-security"><?php echo $entry_hash_key; ?></label>
-            <div class="col-sm-10">
-              <input type="text" name="jostpay_hash_key" value="<?php echo $jostpay_hash_key; ?>" placeholder="<?php echo $entry_hash_key; ?>" id="input-security" class="form-control" required />
-              <?php if ($error_hash_key) { ?>
-              <div class="text-danger"><?php echo $error_hash_key; ?></div>
-              <?php } ?>
-            </div>
-          </div>
           <div class="form-group">
             <label class="col-sm-2 control-label" for="input-callback"><span data-toggle="tooltip" title="<?php echo $help_callback; ?>"><?php echo $entry_callback; ?></span></label>
             <div class="col-sm-10">
